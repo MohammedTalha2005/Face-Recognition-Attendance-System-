@@ -74,7 +74,7 @@ pip install -r requirements.txt
    DB_PASSWORD=your_postgresql_password
    DB_NAME=a_s
    SECRET_KEY=generate-a-secure-random-key-here
-   FACE_SAMPLES_COUNT=20
+   FACE_SAMPLES_COUNT=50
    FACE_SIMILARITY_THRESHOLD=0.6
    ```
 
