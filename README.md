@@ -1,228 +1,150 @@
 # Attendance Monitoring System
 
-A modern, web-based attendance monitoring system with face recognition capabilities built with Flask and OpenCV.
+A modern, web-based automatic attendance monitoring system. This version has been fully upgraded from the legacy LBPH & OpenCV cascade classifiers to a production-grade architecture utilizing **Google MediaPipe Tasks (BlazeFace)** for robust face detection, **Keras-FaceNet** for 512-D face embeddings, and **PostgreSQL** for secure, database-backed embedding storage.
 
-## Features
+---
 
-- 🔐 **User Authentication** - Secure login and registration system
-- 👨‍🎓 **Student Management** - Add, edit, and manage student records
-- 📸 **Face Recognition** - Automatic attendance marking using face detection
-- 📊 **Attendance Tracking** - View and manage attendance records
-- 📥 **CSV Import/Export** - Import and export attendance data
-- 🎨 **Modern UI** - Beautiful, responsive design with dark theme
-- 🔍 **Search & Filter** - Easy search and filtering capabilities
+## 🚀 Key Improvements & Features
 
-## Prerequisites
+- 🧠 **MediaPipe & FaceNet Pipeline**: Upgraded to Google MediaPipe Tasks (`blaze_face_short_range.tflite`) for superior detection accuracy under various lighting/angles, and FaceNet for generating high-fidelity 512-dimensional embeddings.
+- ⚡ **Instant Student Registration**: **Zero retraining required.** Unlike traditional classifier models (e.g., LBPH) that require model rebuilding, newly enrolled students are instantly registered. Face comparison is computed in real-time using Cosine Similarity.
+- 🗄️ **PostgreSQL Database Storage**: All student records, authentication details, attendance logs, and face embeddings are saved in a unified PostgreSQL database (replacing local file-based `data/*.jpg` and `ml_models/classifier.xml`).
+- 🔐 **Secure Administration**: Admin login/registration dashboard built with Flask-Login.
+- 📊 **Attendance Logs**: View attendance, filter records by date or department, and export them directly as CSV sheets.
+- 🎨 **Modern Responsive UI**: Clean, responsive styling with dark-mode aesthetic.
 
-- Python 3.8 or higher
-- MySQL Server with phpMyAdmin (recommended: XAMPP or WAMP)
-- Webcam (for face recognition)
+---
 
-## Installation
+## 🛠️ Prerequisites
 
-### 1. Clone or Download the Project
+- **Python**: version `3.8` to `3.11` (recommended)
+- **PostgreSQL**: Installed and running locally or remotely
+- **Webcam**: Required for student registration and live attendance marking
 
+---
+
+## ⚙️ Installation & Setup
+
+### 1. Set Up the Repository
+Clone or download the project folder, then navigate into it:
 ```bash
-cd "d:/Projects/Attendence System"
+cd "e:/Projects/Attendence System"
 ```
 
-### 2. Create Virtual Environment
-
+### 2. Create and Activate Virtual Environment
+Create a virtual environment to manage dependencies:
 ```bash
 python -m venv venv
 ```
 
-### 3. Activate Virtual Environment
-
-**Windows:**
-```bash
-venv\Scripts\activate
+**Activate on Windows (PowerShell):**
+```powershell
+.\venv\Scripts\Activate.ps1
 ```
 
-**Linux/Mac:**
+**Activate on Linux/macOS:**
 ```bash
 source venv/bin/activate
 ```
 
-### 4. Install Dependencies
-
+### 3. Install Dependencies
+Install all required libraries using the package manager:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Set Up MySQL Database with phpMyAdmin
+### 4. Database Setup
+1. Log into your PostgreSQL instance (e.g., via `pgAdmin` or `psql` shell).
+2. Create a new database named `a_s` (or any name you prefer):
+   ```sql
+   CREATE DATABASE a_s;
+   ```
+3. The application will automatically initialize the database schema and create all required tables (including `students`, `users`, `attendance`, and `face_embeddings`) upon the first startup.
 
-#### Quick Setup (Recommended)
+### 5. Configure Environment Variables
+1. Copy the template file to create your configuration file:
+   ```bash
+   copy .env.example .env
+   ```
+2. Open the newly created `.env` file in your editor and configure your PostgreSQL connection:
+   ```env
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USER=postgres
+   DB_PASSWORD=your_postgresql_password
+   DB_NAME=a_s
+   SECRET_KEY=generate-a-secure-random-key-here
+   FACE_SAMPLES_COUNT=20
+   FACE_SIMILARITY_THRESHOLD=0.6
+   ```
 
-1. **Install XAMPP** (includes MySQL + phpMyAdmin):
-   - Download from [https://www.apachefriends.org/](https://www.apachefriends.org/)
-   - Install and start Apache + MySQL services
-
-2. **Access phpMyAdmin**:
-   - Open browser and go to: `http://localhost/phpmyadmin`
-
-3. **Import Database**:
-   - Click **Import** tab
-   - Choose file: `database_setup.sql` (in project folder)
-   - Click **Go**
-
-#### Detailed Setup Guide
-
-For complete installation instructions, troubleshooting, and phpMyAdmin usage, see:
-📖 **[PHPMYADMIN_SETUP.md](PHPMYADMIN_SETUP.md)**
-
-#### Alternative: Manual Setup
-
-If you prefer to create the database manually:
-
-```sql
-CREATE DATABASE attendance_system;
-```
-
-Then the application will automatically create the required tables on first run.
-
-### 6. Configure Environment Variables
-
-1. Copy `.env.example` to `.env`:
-
+### 6. Run the Application
+Start the Flask dev server using the provided helper batch file or run directly with Python:
 ```bash
-copy .env.example .env
+.\run.bat
 ```
-
-2. Edit `.env` and update your MySQL credentials:
-
-```
-DB_PASSWORD=your-mysql-password-here
-```
-
-### 7. Run the Application
-
+*or*
 ```bash
 python app.py
 ```
+Open **[http://127.0.0.1:5000](http://127.0.0.1:5000)** in your web browser.
 
-The application will be available at: **http://localhost:5000**
+---
 
-## Default Login
+## 👥 Default Credentials
 
-- **Username:** `admin`
-- **Password:** `admin`
+- **Username**: `admin`
+- **Password**: `admin`
 
-> ⚠️ **Important:** Change the default admin password after first login!
+> ⚠️ **Security Warning**: Please change the default credentials or register a new admin user after your first successful login.
 
-## Usage Guide
+---
 
-### 1. Register Students
-
-1. Login to the system
-2. Click "Students" in the navigation
-3. Click "Add Student"
-4. Fill in student details
-5. Click "Save Student"
-
-### 2. Capture Face Photos
-
-1. Go to "Face Recognition" page
-2. Click "Start Camera"
-3. Select a student from the dropdown
-4. Click "Capture for Training"
-5. The system will automatically capture 100 photos
-6. Repeat for all students
-
-### 3. Train the Model
-
-1. After capturing photos for all students
-2. Click "Train Model" button
-3. Wait for training to complete
-
-### 4. Mark Attendance
-
-1. Go to "Face Recognition" page
-2. Click "Start Camera"
-3. Click "Recognize Face"
-4. The system will automatically mark attendance for recognized students
-
-### 5. View Attendance
-
-1. Click "Attendance" in the navigation
-2. Use filters to view specific dates or departments
-3. Export to CSV if needed
-
-## Project Structure
+## 📂 Project Structure
 
 ```
 Attendence System/
-├── app.py                 # Main Flask application
-├── config.py              # Configuration settings
-├── models.py              # Database models
-├── requirements.txt       # Python dependencies
-├── routes/                # Route blueprints
-│   ├── auth.py           # Authentication routes
-│   ├── students.py       # Student management routes
-│   ├── attendance.py     # Attendance routes
-│   └── face_recognition.py # Face recognition routes
-├── templates/             # HTML templates
-│   ├── base.html
-│   ├── login.html
-│   ├── register.html
-│   ├── dashboard.html
-│   ├── students.html
-│   ├── student_form.html
-│   ├── attendance.html
-│   └── face_recognition.html
-├── static/                # Static files
-│   ├── css/
-│   │   └── style.css     # Main stylesheet
+├── app.py                     # Main Flask entrypoint & app factory
+├── config.py                  # PostgreSQL & FaceNet configurations
+├── models.py                  # SQLAlchemy Database Models (Student, Attendance, FaceEmbedding)
+├── face_detection.py          # Wrapper for Google MediaPipe Tasks face detection
+├── face_recognition_engine.py # Embedding generator using Keras-FaceNet
+├── requirements.txt           # Project dependencies
+├── run.bat                    # Windows startup script
+├── routes/                    # Blueprint routes
+│   ├── auth.py                # Admin user auth (Login, Register, Logout)
+│   ├── students.py            # Student profiles management
+│   ├── attendance.py          # Attendance logging, viewing, and exporting
+│   └── face_recognition.py    # Face scan registration & attendance detection routes
+├── ml_models/                 # Stores model files
+│   └── blaze_face_short_range.tflite # MediaPipe Face Detection model
+├── static/                    # Front-end static assets
+│   ├── css/style.css          # Main responsive stylesheet
 │   └── js/
-│       ├── main.js       # Main JavaScript
-│       └── camera.js     # Camera functionality
-├── data/                  # Student face images (auto-created)
-├── ml_models/             # Trained models (auto-created)
-└── static/uploads/        # Uploaded files (auto-created)
+│       ├── main.js            # General UI helpers
+│       └── camera.js          # WebRTC webcam utility logic
+└── templates/                 # Jinja2 HTML templates
 ```
 
-## Troubleshooting
+---
 
-### Camera Not Working
+## 🔍 Troubleshooting
 
-- Ensure your browser has camera permissions
-- Use HTTPS in production (required for camera access)
-- Check if another application is using the camera
+### Camera Not Opening
+- Ensure you have granted the browser permissions to access your webcam.
+- If using Chrome/Edge on remote deployment, camera access requires **HTTPS** protocols.
 
-### Database Connection Error
+### Database Connection Crashes
+- Double-check the `DB_USER`, `DB_PASSWORD`, and `DB_PORT` values in your `.env` file.
+- Verify that your local PostgreSQL service is running. On Windows, you can check this under Windows Services (`services.msc`).
+- If you have special characters (e.g. `@`, `#`) in your PostgreSQL password, the application automatically handles URL-encoding, but double-check details if connection fails.
 
-- Verify MySQL is running (check XAMPP Control Panel)
-- Check database credentials in `.env`
-- Ensure the database exists (check in phpMyAdmin)
-- Default XAMPP credentials: username=`root`, password=(empty)
-- See [PHPMYADMIN_SETUP.md](PHPMYADMIN_SETUP.md) for detailed troubleshooting
+---
 
-### Face Recognition Not Working
+## 💡 Technologies Used
 
-- Ensure you've captured photos for students
-- Train the model after capturing photos
-- Check lighting conditions (good lighting improves accuracy)
-
-## Technologies Used
-
-- **Backend:** Flask, SQLAlchemy, Flask-Login
-- **Database:** MySQL
-- **Face Recognition:** OpenCV, LBPH Face Recognizer
-- **Frontend:** HTML5, CSS3, JavaScript
-- **Styling:** Custom CSS with modern design
-
-## Security Notes
-
-- Change default admin credentials
-- Use strong passwords
-- Keep `.env` file secure
-- Use HTTPS in production
-- Regularly backup your database
-
-## License
-
-This project is for educational purposes.
-
-## Support
-
-For issues or questions, please check the troubleshooting section or contact your system administrator.
+- **Web Framework**: Flask, Werkzeug
+- **ORM & Database**: Flask-SQLAlchemy, PostgreSQL (`psycopg2-binary`)
+- **Face Detection**: Google MediaPipe (Tasks Vision API)
+- **Face Embeddings**: Keras-FaceNet (TensorFlow back-end)
+- **Front-end**: Vanilla JS, WebRTC, custom CSS
