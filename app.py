@@ -1,8 +1,11 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 from flask import Flask, render_template, redirect, url_for, flash, session
 from flask_login import LoginManager, current_user
 from models import db, User
 from config import config
-import os
 
 # Initialize Flask-Login
 login_manager = LoginManager()

@@ -12,33 +12,39 @@ class Config:
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
     MODEL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
+    EMBEDDINGS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'embeddings')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
-    
-    # Database configuration
+
+    # Database configuration (PostgreSQL)
     DB_HOST = os.environ.get('DB_HOST') or 'localhost'
-    DB_PORT = os.environ.get('DB_PORT') or '3306'
-    DB_USER = os.environ.get('DB_USER') or 'root'
-    # Use empty string if DB_PASSWORD is set to empty in .env, otherwise use default
-    DB_PASSWORD = os.environ.get('DB_PASSWORD')
-    if DB_PASSWORD is None:
-        DB_PASSWORD = '' # Default to empty for XAMPP if not in .env at all
-        
-    DB_NAME = os.environ.get('DB_NAME') or 'attendance_system'
-    
-    SQLALCHEMY_DATABASE_URI = f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    
-    # Face recognition settings
-    FACE_CONFIDENCE_THRESHOLD = int(os.environ.get('FACE_CONFIDENCE_THRESHOLD') or 77)
-    FACE_SAMPLES_COUNT = 100
-    print(f"DEBUG: FACE_SAMPLES_COUNT initialized to {FACE_SAMPLES_COUNT}")
-    
+    DB_PORT = os.environ.get('DB_PORT') or '5432'
+    DB_USER = os.environ.get('DB_USER') or 'postgres'
+    DB_PASSWORD = os.environ.get('DB_PASSWORD') or ''
+    DB_NAME = os.environ.get('DB_NAME') or 'a_s'
+
+    # URL-encode password to handle special characters (e.g. @ in Talha@786)
+    try:
+        from urllib.parse import quote_plus
+        _db_password_encoded = quote_plus(DB_PASSWORD)
+    except Exception:
+        _db_password_encoded = DB_PASSWORD
+
+    SQLALCHEMY_DATABASE_URI = (
+        f"postgresql+psycopg2://{DB_USER}:{_db_password_encoded}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+
+    # FaceNet recognition settings
+    FACE_SAMPLES_COUNT = int(os.environ.get('FACE_SAMPLES_COUNT') or 50)
+    FACE_SIMILARITY_THRESHOLD = float(os.environ.get('FACE_SIMILARITY_THRESHOLD') or 0.6)
+
     # Ensure required directories exist
     @staticmethod
     def init_app(app):
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(Config.DATA_FOLDER, exist_ok=True)
         os.makedirs(Config.MODEL_FOLDER, exist_ok=True)
+        os.makedirs(Config.EMBEDDINGS_FOLDER, exist_ok=True)
         os.makedirs(os.path.join(Config.UPLOAD_FOLDER, 'students'), exist_ok=True)
 
 class DevelopmentConfig(Config):

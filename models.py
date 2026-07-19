@@ -53,8 +53,9 @@ class Student(db.Model):
     photo_sample = db.Column(db.String(10), default='No')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relationship with attendance
+    # Relationships
     attendance_records = db.relationship('Attendance', backref='student', lazy=True, cascade='all, delete-orphan')
+    face_embeddings = db.relationship('FaceEmbedding', backref='student', lazy=True, cascade='all, delete-orphan')
     
     def to_dict(self):
         """Convert student object to dictionary"""
@@ -111,3 +112,28 @@ class Attendance(db.Model):
     
     def __repr__(self):
         return f'<Attendance {self.name} - {self.date} {self.time}>'
+
+class FaceEmbedding(db.Model):
+    """FaceNet 512-D embedding per student (replaces classifier.xml + LBPH)."""
+    __tablename__ = 'face_embeddings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(
+        db.String(50),
+        db.ForeignKey('students.student_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True
+    )
+    # JSON-serialized list of 512 floats (L2-normalized)
+    embedding = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
+        }
+
+    def __repr__(self):
+        return f'<FaceEmbedding student={self.student_id}>'

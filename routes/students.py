@@ -111,17 +111,18 @@ def edit(id):
 @students_bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 def delete(id):
-    """Delete student"""
+    """Delete student and associated face data."""
     student = Student.query.get_or_404(id)
-    
+
     try:
-        # Delete student photos if they exist
+        # Delete student photo folder if it exists (legacy grayscale JPEGs)
         data_folder = Config.DATA_FOLDER
-        if os.path.exists(data_folder):
-            for filename in os.listdir(data_folder):
-                if filename.startswith(f"user.{student.id}."):
-                    os.remove(os.path.join(data_folder, filename))
-        
+        student_folder = os.path.join(data_folder, f"student_{student.id}")
+        if os.path.exists(student_folder):
+            import shutil
+            shutil.rmtree(student_folder, ignore_errors=True)
+
+        # FaceEmbedding rows are cascade-deleted by DB FK (ondelete='CASCADE')
         db.session.delete(student)
         db.session.commit()
         flash(f'Student {student.name} deleted successfully!', 'success')
@@ -129,7 +130,7 @@ def delete(id):
         db.session.rollback()
         flash('An error occurred while deleting the student', 'error')
         print(f"Delete student error: {e}")
-    
+
     return redirect(url_for('students.index'))
 
 @students_bp.route('/api/search')
