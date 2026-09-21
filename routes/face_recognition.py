@@ -89,9 +89,11 @@ def capture_photos(student_id):
             return jsonify({'success': False, 'message': 'No images provided'})
 
         detector = get_detector()
+        anti_spoof_detector = get_anti_spoof_detector(threshold=Config.ANTI_SPOOF_THRESHOLD)
         embeddings_collected = []
         frames_processed = 0
         frames_with_face = 0
+        spoof_frames_detected = 0
 
         for idx, img_b64 in enumerate(image_data):
             img = _decode_base64_image(img_b64)
@@ -110,21 +112,37 @@ def capture_photos(student_id):
                 logger.warning(f"Frame {idx}: multiple faces detected ({len(face_crops)}) — skipping to prevent profile contamination")
                 continue
 
-            frames_with_face += 1
             # Single verified face
             face_bgr, _ = face_crops[0]
+
+            # Anti-Spoofing / Liveness Check during Registration
+            is_real, liveness_score, reason = anti_spoof_detector.predict(face_bgr, img)
+            if not is_real:
+                logger.warning(f"Registration Frame {idx}: spoof detected (score: {liveness_score:.3f}): {reason}")
+                spoof_frames_detected += 1
+                continue
+
+            frames_with_face += 1
 
             # FaceNet embedding
             emb = generate_embedding(face_bgr)
             if emb is not None:
                 embeddings_collected.append(emb)
 
-        if not embeddings_collected:
+        if len(embeddings_collected) < 10:
+            if spoof_frames_detected > 5:
+                return jsonify({
+                    'success': False,
+                    'is_spoof': True,
+                    'message': (
+                        '⚠️ Registration rejected: Live human face required! '
+                        'Physical ID cards, printed photos, or digital screens cannot be enrolled.'
+                    )
+                })
             return jsonify({
                 'success': False,
                 'message': (
-                    f'Could not extract face embeddings. '
-                    f'{frames_with_face}/{frames_processed} frames had a face detected. '
+                    f'Could not extract enough valid face embeddings ({len(embeddings_collected)}/50 valid). '
                     f'Please ensure good lighting, face the camera directly, and ensure only one person is in frame.'
                 )
             })
