@@ -13,7 +13,7 @@ There is NO train-model step anymore — embeddings are computed at capture time
 
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
-from models import db, Student, Attendance, FaceEmbedding
+from models import db, Student, Attendance
 import cv2
 import numpy as np
 import base64
@@ -23,11 +23,11 @@ from config import Config
 
 # Import new modules
 from face_detection import get_detector
+from anti_spoofing import get_anti_spoof_detector
+from vector_store import get_vector_store
 from face_recognition_engine import (
     generate_embedding,
     average_embeddings,
-    embedding_to_json,
-    json_to_embedding,
     find_best_match,
 )
 
@@ -106,8 +106,12 @@ def capture_photos(student_id):
                 logger.debug(f"Frame {idx}: no face detected")
                 continue
 
+            if len(face_crops) > 1:
+                logger.warning(f"Frame {idx}: multiple faces detected ({len(face_crops)}) — skipping to prevent profile contamination")
+                continue
+
             frames_with_face += 1
-            # Use the first (largest) detected face
+            # Single verified face
             face_bgr, _ = face_crops[0]
 
             # FaceNet embedding
@@ -121,7 +125,7 @@ def capture_photos(student_id):
                 'message': (
                     f'Could not extract face embeddings. '
                     f'{frames_with_face}/{frames_processed} frames had a face detected. '
-                    f'Please ensure good lighting and face the camera directly.'
+                    f'Please ensure good lighting, face the camera directly, and ensure only one person is in frame.'
                 )
             })
 
@@ -130,15 +134,13 @@ def capture_photos(student_id):
         if avg_emb is None:
             return jsonify({'success': False, 'message': 'Failed to compute average embedding'})
 
-        # Remove old embeddings for this student (re-registration)
-        FaceEmbedding.query.filter_by(student_id=student.student_id).delete()
-
-        # Store new embedding
-        new_emb = FaceEmbedding(
+        # Upsert 512-D master vector directly into ChromaDB Vector Store
+        vector_store = get_vector_store()
+        vector_store.upsert_student(
             student_id=student.student_id,
-            embedding=embedding_to_json(avg_emb)
+            embedding=avg_emb,
+            metadata={'name': student.name, 'roll_no': student.roll_no, 'department': student.department}
         )
-        db.session.add(new_emb)
 
         # Mark student as having face data
         student.photo_sample = 'Yes'
@@ -197,31 +199,41 @@ def recognize():
                 'message': 'No face detected. Please face the camera directly in good lighting.'
             })
 
-        # Load all stored embeddings from DB
-        all_stored = FaceEmbedding.query.all()
-        if not all_stored:
+        # Strict Single-Person Gate: reject if more than one person is in the frame
+        if len(face_crops) > 1:
+            return jsonify({
+                'success': False,
+                'message': f'Multiple faces detected ({len(face_crops)} people in frame). Please step forward one person at a time.'
+            })
+
+        # Check ChromaDB Vector Store
+        vector_store = get_vector_store()
+        if vector_store.get_count() == 0:
             return jsonify({
                 'success': False,
                 'message': 'No students registered yet. Please register students first.'
             })
 
-        stored_list = [
-            {'student_id': rec.student_id, 'embedding': rec.embedding}
-            for rec in all_stored
-        ]
-
+        anti_spoof_detector = get_anti_spoof_detector(threshold=Config.ANTI_SPOOF_THRESHOLD)
         recognized_students = []
+        spoof_detected = False
 
         for face_bgr, _ in face_crops:
+            # Anti-Spoofing / Liveness Check
+            is_real, liveness_score, reason = anti_spoof_detector.predict(face_bgr, img)
+            if not is_real:
+                logger.warning(f"Spoof detected (score: {liveness_score:.3f}): {reason}")
+                spoof_detected = True
+                continue
+
             query_emb = generate_embedding(face_bgr)
             if query_emb is None:
                 continue
 
-            match = find_best_match(
+            # Query ChromaDB vector database in < 1ms
+            match = vector_store.find_best_match(
                 query_emb,
-                stored_list,
-                threshold=Config.FACE_SIMILARITY_THRESHOLD,
-                metric='cosine'
+                threshold=Config.FACE_SIMILARITY_THRESHOLD
             )
 
             if match is None:
@@ -265,6 +277,15 @@ def recognize():
 
         if recognized_students:
             return jsonify({'success': True, 'students': recognized_students})
+        elif spoof_detected:
+            return jsonify({
+                'success': False,
+                'is_spoof': True,
+                'message': (
+                    '⚠️ Spoof attempt detected! '
+                    'Please present a live human face, not an ID card, paper photo, or screen.'
+                )
+            })
         else:
             return jsonify({
                 'success': False,
@@ -288,12 +309,12 @@ def reset_embeddings(student_id):
     """Delete stored embeddings for a student so they can re-register."""
     student = Student.query.get_or_404(student_id)
     try:
-        deleted = FaceEmbedding.query.filter_by(student_id=student.student_id).delete()
+        get_vector_store().delete_student(student.student_id)
         student.photo_sample = 'No'
         db.session.commit()
         return jsonify({
             'success': True,
-            'message': f'Cleared {deleted} embedding(s) for {student.name}. Student can now re-register.'
+            'message': f'Cleared embedding(s) for {student.name}. Student can now re-register.'
         })
     except Exception as e:
         db.session.rollback()
@@ -308,10 +329,10 @@ def reset_embeddings(student_id):
 def embedding_status(student_id):
     """Check if a student has face embeddings registered."""
     student = Student.query.get_or_404(student_id)
-    count = FaceEmbedding.query.filter_by(student_id=student.student_id).count()
+    has_sample = (student.photo_sample == 'Yes')
     return jsonify({
         'student_id': student.student_id,
         'name': student.name,
-        'has_embedding': count > 0,
-        'embedding_count': count
+        'has_embedding': has_sample,
+        'embedding_count': 1 if has_sample else 0
     })

@@ -10,7 +10,6 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-    DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
     MODEL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
     EMBEDDINGS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'embeddings')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
@@ -37,12 +36,12 @@ class Config:
     # FaceNet recognition settings
     FACE_SAMPLES_COUNT = int(os.environ.get('FACE_SAMPLES_COUNT') or 50)
     FACE_SIMILARITY_THRESHOLD = float(os.environ.get('FACE_SIMILARITY_THRESHOLD') or 0.6)
+    ANTI_SPOOF_THRESHOLD = float(os.environ.get('ANTI_SPOOF_THRESHOLD') or 0.65)
 
     # Ensure required directories exist
     @staticmethod
     def init_app(app):
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-        os.makedirs(Config.DATA_FOLDER, exist_ok=True)
         os.makedirs(Config.MODEL_FOLDER, exist_ok=True)
         os.makedirs(Config.EMBEDDINGS_FOLDER, exist_ok=True)
         os.makedirs(os.path.join(Config.UPLOAD_FOLDER, 'students'), exist_ok=True)

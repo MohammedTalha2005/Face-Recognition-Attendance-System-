@@ -264,6 +264,14 @@ async function recognizeFace() {
             // ADD SUCCESS POPUP
             console.log("Recognition Success:", names.join(', '));
             showNotification(`Recognized: ${names.join(', ')}`, 'success');
+        } else if (result.is_spoof) {
+            const msg = result.message || '⚠️ Spoof attempt detected! Please present a live human face.';
+            contentDiv.innerHTML = `<div style="font-weight: 600; color: #f87171; padding: 0.25rem 0;">${msg}</div>`;
+            resultDiv.className = 'alert alert-error';
+            resultDiv.style.display = 'block';
+
+            console.log("Spoof Attempt Blocked:", msg);
+            showNotification(msg, 'error');
         } else {
             const msg = result.message || 'No face recognized. Try better lighting.';
             contentDiv.innerHTML = msg;

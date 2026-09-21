@@ -115,14 +115,10 @@ def delete(id):
     student = Student.query.get_or_404(id)
 
     try:
-        # Delete student photo folder if it exists (legacy grayscale JPEGs)
-        data_folder = Config.DATA_FOLDER
-        student_folder = os.path.join(data_folder, f"student_{student.id}")
-        if os.path.exists(student_folder):
-            import shutil
-            shutil.rmtree(student_folder, ignore_errors=True)
+        # Delete student vector from ChromaDB
+        from vector_store import get_vector_store
+        get_vector_store().delete_student(student.student_id)
 
-        # FaceEmbedding rows are cascade-deleted by DB FK (ondelete='CASCADE')
         db.session.delete(student)
         db.session.commit()
         flash(f'Student {student.name} deleted successfully!', 'success')

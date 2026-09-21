@@ -50,6 +50,7 @@ static/uploads/
 Attendance.csv
 classifier.xml
 *.log
+*.pem
 *.txt
 !requirements.txt
 !README.md
@@ -65,3 +66,4 @@ utils/
 __pycache__/
 .DS_Store
 Thumbs.db
+embeddings/chroma_db/

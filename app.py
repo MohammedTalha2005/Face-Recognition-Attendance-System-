@@ -80,6 +80,97 @@ def create_app(config_name='default'):
     
     return app
 
+
+def get_or_create_ssl_context():
+    """Generate or retrieve persistent self-signed SSL certificate with SAN for HTTPS."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cert_path = os.path.join(base_dir, 'cert.pem')
+    key_path = os.path.join(base_dir, 'key.pem')
+
+    if not (os.path.exists(cert_path) and os.path.exists(key_path)):
+        try:
+            import datetime
+            import ipaddress
+            import socket
+            from cryptography import x509
+            from cryptography.x509.oid import NameOID
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import rsa
+
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            subject = issuer = x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, u"192.168.31.200"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Attendance System"),
+            ])
+
+            san_list = [
+                x509.DNSName(u"localhost"),
+                x509.IPAddress(ipaddress.IPv4Address(u"127.0.0.1")),
+                x509.IPAddress(ipaddress.IPv4Address(u"192.168.31.200")),
+            ]
+            try:
+                hostname = socket.gethostname()
+                local_ip = socket.gethostbyname(hostname)
+                if local_ip not in ("127.0.0.1", "192.168.31.200"):
+                    san_list.append(x509.IPAddress(ipaddress.IPv4Address(local_ip)))
+            except Exception:
+                pass
+
+            cert = (
+                x509.CertificateBuilder()
+                .subject_name(subject)
+                .issuer_name(issuer)
+                .public_key(key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
+                .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=3650))
+                .add_extension(x509.SubjectAlternativeName(san_list), critical=False)
+                .sign(key, hashes.SHA256())
+            )
+
+            with open(key_path, "wb") as f:
+                f.write(key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption(),
+                ))
+
+            with open(cert_path, "wb") as f:
+                f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        except Exception:
+            return 'adhoc'
+
+    return (cert_path, key_path)
+
+
 if __name__ == '__main__':
+    import threading
+    from werkzeug.serving import run_simple
+
     app = create_app(os.environ.get('FLASK_ENV', 'development'))
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    use_ssl = os.environ.get('USE_SSL', 'true').lower() in ('1', 'true', 'yes')
+    ssl_ctx = get_or_create_ssl_context() if use_ssl else None
+
+    # Run plain HTTP on port 5000 in background daemon thread (Zero SSL warnings on localhost)
+    def run_http():
+        run_simple('0.0.0.0', 5000, app, use_reloader=False, threaded=True)
+
+    http_thread = threading.Thread(target=run_http, daemon=True)
+    http_thread.start()
+
+    print("\n" + "=" * 60)
+    print(" [DUAL SERVER RUNNING] Attendance System")
+    print("=" * 60)
+    print(" >> Localhost (HTTP - NO WARNING):   http://127.0.0.1:5000")
+    print("                                     http://localhost:5000")
+    if ssl_ctx:
+        print(" >> Network Phone (HTTPS with SSL):  https://192.168.31.200:5001")
+        print("                                     https://127.0.0.1:5001")
+    print("=" * 60 + "\n")
+
+    if ssl_ctx:
+        # Run HTTPS on port 5001 in main thread
+        run_simple('0.0.0.0', 5001, app, ssl_context=ssl_ctx, use_reloader=False, threaded=True)
+    else:
+        http_thread.join()

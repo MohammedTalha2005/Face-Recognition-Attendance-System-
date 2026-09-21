@@ -87,7 +87,9 @@ Start the Flask dev server using the provided helper batch file or run directly 
 ```bash
 python app.py
 ```
-Open **[http://127.0.0.1:5000](http://127.0.0.1:5000)** in your web browser.
+Open **[https://127.0.0.1:5001](https://127.0.0.1:5001)** (Local) or **[https://192.168.31.200:5001](https://192.168.31.200:5001)** (Local Network) in your web browser.
+
+> 🔒 **HTTPS Note**: Since the server uses a self-signed SSL certificate for secure camera access, your browser may show a "Your connection is not private" warning on first visit. Simply click **Advanced -> Proceed to 192.168.31.200 (unsafe)** to open the app and enable full camera access on mobile and remote laptops!
 
 ---
 
